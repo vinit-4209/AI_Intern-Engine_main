@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from database import Application, Internship, Student, get_db
@@ -53,6 +53,20 @@ def create_application(application: ApplicationCreate, db: Session = Depends(get
     db.commit()
     db.refresh(db_application)
     return db_application
+
+
+@router.delete("/{application_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_application(application_id: int, db: Session = Depends(get_db)):
+    """Allow a student to withdraw an application."""
+
+    application = db.query(Application).filter(Application.id == application_id).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    db.delete(application)
+    db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/student/{student_id}", response_model=List[ApplicationResponse])

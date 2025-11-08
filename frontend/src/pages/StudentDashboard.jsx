@@ -12,6 +12,47 @@ function StudentDashboard({ user, onLogout }) {
   const [studentInfo, setStudentInfo] = useState(null)
   const [applyingId, setApplyingId] = useState(null)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [withdrawingId, setWithdrawingId] = useState(null)
+
+  const APPLICATION_STAGES = useMemo(
+    () => [
+      {
+        key: "applied",
+        label: "Applied",
+        description: "Your application has been submitted and is awaiting review.",
+        statuses: ["pending", "new", "applied"],
+      },
+      {
+        key: "shortlisted",
+        label: "Shortlisted",
+        description: "The company liked your profile and moved you forward.",
+        statuses: ["shortlisted"],
+      },
+      {
+        key: "interview",
+        label: "Interview",
+        description: "Interview discussions are in progress with the company.",
+        statuses: ["contacted", "interview"],
+      },
+      {
+        key: "outcome",
+        label: "Outcome",
+        description: "Awaiting the company’s final decision.",
+        statuses: ["hired", "rejected", "not a fit", "not_a_fit"],
+      },
+    ],
+    [],
+  )
+
+  const stageOrder = useMemo(() => {
+    return APPLICATION_STAGES.reduce((map, stage, index) => {
+      map[stage.key] = index
+      stage.statuses.forEach((status) => {
+        map[status] = index
+      })
+      return map
+    }, {})
+  }, [APPLICATION_STAGES])
 
   const APPLICATION_STAGES = useMemo(
     () => [
@@ -144,19 +185,123 @@ function StudentDashboard({ user, onLogout }) {
 
   const normalizeApplicationStatus = (status) => {
     if (!status) return "pending"
-    const normalized = status.toLowerCase()
-    if (normalized === "new") return "pending"
+    const normalized = status.toLowerCase().trim()
+    if (normalized === "new" || normalized === "applied") return "pending"
+    if (normalized === "interview") return "contacted"
+    if (normalized === "not a fit" || normalized === "not_a_fit") return "rejected"
     return normalized
+  }
+
+  const mapStatusToStageKey = (status) => {
+    const normalized = normalizeApplicationStatus(status)
+    if (normalized === "shortlisted") return "shortlisted"
+    if (normalized === "contacted") return "interview"
+    if (normalized === "hired" || normalized === "rejected") return "outcome"
+    return "applied"
   }
 
   const formatApplicationStatus = (status) => {
     const normalized = normalizeApplicationStatus(status)
-    const stage = APPLICATION_STAGES.find((item) => item.value === normalized)
-    if (stage) {
-      return stage.label
+    switch (normalized) {
+      case "pending":
+        return "Applied"
+      case "shortlisted":
+        return "Shortlisted"
+      case "contacted":
+        return "Interview"
+      case "hired":
+        return "Hired"
+      case "rejected":
+        return "Not a Fit"
+      default:
+        return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+    }
+  }
+
+  const getStageState = (stageKey, currentStatus) => {
+    const normalized = normalizeApplicationStatus(currentStatus)
+    const currentStageKey = mapStatusToStageKey(currentStatus)
+    const currentIndex = stageOrder[currentStageKey] ?? 0
+    const stageIndex = stageOrder[stageKey] ?? 0
+
+    if (stageKey === "outcome" && ["hired", "rejected"].includes(normalized)) {
+      return "completed"
     }
 
-    return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+    if (stageIndex < currentIndex) return "completed"
+    if (stageIndex === currentIndex) return "current"
+    return "upcoming"
+  }
+
+  const calculateProgress = (status) => {
+    const currentStageKey = mapStatusToStageKey(status)
+    const currentIndex = stageOrder[currentStageKey] ?? 0
+    const totalStages = APPLICATION_STAGES.length - 1
+    if (totalStages <= 0) return 0
+
+    return Math.min(100, Math.max(0, (currentIndex / totalStages) * 100))
+  }
+
+  const getStageLabel = (stageKey, status) => {
+    const normalized = normalizeApplicationStatus(status)
+    if (stageKey === "outcome") {
+      if (normalized === "hired") return "Hired"
+      if (normalized === "rejected") return "Not a Fit"
+      return "Outcome Pending"
+    }
+
+    const stage = APPLICATION_STAGES.find((item) => item.key === stageKey)
+    return stage?.label ?? stageKey
+  }
+
+  const getStageDescription = (stageKey, status) => {
+    const normalized = normalizeApplicationStatus(status)
+    if (stageKey === "outcome") {
+      if (normalized === "hired") {
+        return "Congratulations! You have been selected for the role."
+      }
+      if (normalized === "rejected") {
+        return "The company has closed your application for this role."
+      }
+      return "The company is reviewing your candidacy for a final decision."
+    }
+
+    const stage = APPLICATION_STAGES.find((item) => item.key === stageKey)
+    return stage?.description ?? ""
+  }
+
+  const withdrawApplication = async (match) => {
+    if (!match?.application?.id || withdrawingId === match.application.id) {
+      return
+    }
+
+    const confirmationMessage =
+      typeof window !== "undefined"
+        ? window.confirm("Are you sure you want to withdraw this application?")
+        : true
+
+    if (!confirmationMessage) {
+      return
+    }
+
+    setWithdrawingId(match.application.id)
+
+    try {
+      await api.delete(`/applications/${match.application.id}`)
+      setMatches((previousMatches) =>
+        previousMatches.map((currentMatch) =>
+          currentMatch.id === match.id
+            ? { ...currentMatch, application: null }
+            : currentMatch,
+        ),
+      )
+      alert("Application withdrawn successfully.")
+    } catch (error) {
+      const message = error.response?.data?.detail || "Failed to withdraw application."
+      alert(message)
+    } finally {
+      setWithdrawingId(null)
+    }
   }
 
   const getStageState = (stageValue, currentStatus) => {
@@ -313,6 +458,13 @@ function StudentDashboard({ user, onLogout }) {
                 const recruiterEmail = match.internship.contact_email || match.internship.company_email
 
                 const scoreColor = getScoreColor(match.match_score)
+                const normalizedApplicationStatus = match.application
+                  ? normalizeApplicationStatus(match.application.status)
+                  : null
+                const progressBarClass =
+                  normalizedApplicationStatus === "rejected"
+                    ? "bg-gradient-to-r from-rose-500 via-rose-400 to-rose-300"
+                    : "bg-gradient-to-r from-primary via-secondary to-emerald-500"
 
                 return (
                   <div key={match.id} className="group relative">
@@ -412,48 +564,61 @@ function StudentDashboard({ user, onLogout }) {
                                 <div className="relative">
                                   <div className="h-2 w-full rounded-full bg-gray-200" />
                                   <div
-                                    className="absolute top-0 left-0 h-2 rounded-full bg-gradient-to-r from-primary via-secondary to-emerald-500 transition-all duration-500"
+                                    className={`absolute top-0 left-0 h-2 rounded-full transition-all duration-500 ${progressBarClass}`}
                                     style={{ width: `${calculateProgress(match.application.status)}%` }}
                                   />
                                   <div className="absolute top-1/2 left-0 right-0 flex -translate-y-1/2 justify-between">
                                     {APPLICATION_STAGES.map((stage, index) => {
-                                      const state = getStageState(stage.value, match.application.status)
+                                      const state = getStageState(stage.key, match.application.status)
+                                      const isOutcomeStage = stage.key === "outcome"
                                       const baseCircle =
                                         state === "completed"
-                                          ? "border-transparent bg-gradient-to-r from-primary to-secondary text-white shadow"
+                                          ? isOutcomeStage && normalizedApplicationStatus === "rejected"
+                                            ? "border-transparent bg-gradient-to-r from-rose-500 to-rose-400 text-white shadow"
+                                            : "border-transparent bg-gradient-to-r from-primary to-secondary text-white shadow"
                                           : state === "current"
                                             ? "border-primary bg-white text-primary shadow"
                                             : "border-gray-300 bg-white text-gray-400"
 
+                                      const stageLabel = getStageLabel(stage.key, match.application.status)
+
+                                      const renderIcon = () => {
+                                        if (state !== "completed") {
+                                          return index + 1
+                                        }
+
+                                        if (isOutcomeStage && normalizedApplicationStatus === "rejected") {
+                                          return (
+                                            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                          )
+                                        }
+
+                                        return (
+                                          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                          </svg>
+                                        )
+                                      }
+
                                       return (
-                                        <div key={stage.value} className="flex flex-col items-center">
+                                        <div key={stage.key} className="flex flex-col items-center">
                                           <div
                                             className={`flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-semibold transition ${baseCircle}`}
                                           >
-                                            {state === "completed" ? (
-                                              <svg
-                                                className="h-5 w-5"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2"
-                                                viewBox="0 0 24 24"
-                                              >
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                              </svg>
-                                            ) : (
-                                              index + 1
-                                            )}
+                                            {renderIcon()}
                                           </div>
-                                          <p className="mt-2 text-xs font-medium text-gray-700">{stage.label}</p>
+                                          <p className="mt-2 text-xs font-medium text-gray-700">{stageLabel}</p>
                                         </div>
                                       )
                                     })}
                                   </div>
                                 </div>
-                                <div className="mt-10 grid gap-3 text-xs text-gray-500 md:grid-cols-5">
+                                <div className="mt-10 grid gap-3 text-xs text-gray-500 md:grid-cols-4">
                                   {APPLICATION_STAGES.map((stage) => (
-                                    <p key={stage.value} className="text-center md:text-left">
-                                      {stage.description}
+                                    <p key={stage.key} className="text-center md:text-left">
+                                      {getStageDescription(stage.key, match.application.status)}
                                     </p>
                                   ))}
                                 </div>
@@ -477,6 +642,15 @@ function StudentDashboard({ user, onLogout }) {
                                 ? "Submitting..."
                                 : "Apply Now"}
                           </button>
+                          {match.application && (
+                            <button
+                              onClick={() => withdrawApplication(match)}
+                              disabled={withdrawingId === match.application.id}
+                              className="inline-flex items-center justify-center rounded-xl border border-rose-200 px-6 py-3 text-sm font-semibold text-rose-600 transition hover:border-rose-400 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {withdrawingId === match.application.id ? "Withdrawing..." : "Withdraw Application"}
+                            </button>
+                          )}
                           {recruiterEmail ? (
                             <a
                               href={`mailto:${recruiterEmail}`}
