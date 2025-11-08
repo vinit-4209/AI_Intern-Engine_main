@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import api from "../api/axios"
 import SiteLayout from "../components/SiteLayout"
 import UpdateProfileModal from "../components/UpdateProfileModal"
@@ -12,6 +12,44 @@ function StudentDashboard({ user, onLogout }) {
   const [studentInfo, setStudentInfo] = useState(null)
   const [applyingId, setApplyingId] = useState(null)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
+
+  const APPLICATION_STAGES = useMemo(
+    () => [
+      {
+        value: "pending",
+        label: "Pending",
+        description: "Your application has been submitted and is awaiting review.",
+      },
+      {
+        value: "shortlisted",
+        label: "Shortlisted",
+        description: "The company liked your profile and moved you forward.",
+      },
+      {
+        value: "contacted",
+        label: "Interview",
+        description: "Interview discussions are in progress with the company.",
+      },
+      {
+        value: "hired",
+        label: "Hired",
+        description: "Congratulations! You have been selected for the role.",
+      },
+      {
+        value: "rejected",
+        label: "Not a Fit",
+        description: "The application was closed for this opportunity.",
+      },
+    ],
+    [],
+  )
+
+  const stageOrder = useMemo(() => {
+    return APPLICATION_STAGES.reduce((map, stage, index) => {
+      map[stage.value] = index
+      return map
+    }, {})
+  }, [APPLICATION_STAGES])
 
   useEffect(() => {
     fetchStudentInfo()
@@ -104,24 +142,40 @@ function StudentDashboard({ user, onLogout }) {
     return "text-red-600 bg-red-50"
   }
 
-  const formatApplicationStatus = (status) => {
-    if (!status) return "Pending"
-
+  const normalizeApplicationStatus = (status) => {
+    if (!status) return "pending"
     const normalized = status.toLowerCase()
-    const statusMap = {
-      pending: "Pending",
-      new: "Pending",
-      shortlisted: "Shortlisted",
-      contacted: "Contacted",
-      hired: "Hired",
-      rejected: "Not a Fit",
-    }
+    if (normalized === "new") return "pending"
+    return normalized
+  }
 
-    if (statusMap[normalized]) {
-      return statusMap[normalized]
+  const formatApplicationStatus = (status) => {
+    const normalized = normalizeApplicationStatus(status)
+    const stage = APPLICATION_STAGES.find((item) => item.value === normalized)
+    if (stage) {
+      return stage.label
     }
 
     return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+  }
+
+  const getStageState = (stageValue, currentStatus) => {
+    const normalized = normalizeApplicationStatus(currentStatus)
+    const currentIndex = stageOrder[normalized] ?? 0
+    const stageIndex = stageOrder[stageValue] ?? 0
+
+    if (stageIndex < currentIndex) return "completed"
+    if (stageIndex === currentIndex) return "current"
+    return "upcoming"
+  }
+
+  const calculateProgress = (status) => {
+    const normalized = normalizeApplicationStatus(status)
+    const currentIndex = stageOrder[normalized] ?? 0
+    const totalStages = APPLICATION_STAGES.length - 1
+    if (totalStages <= 0) return 0
+
+    return Math.min(100, Math.max(0, (currentIndex / totalStages) * 100))
   }
 
   return (
@@ -256,111 +310,189 @@ function StudentDashboard({ user, onLogout }) {
                   return null
                 }
 
+                const recruiterEmail = match.internship.contact_email || match.internship.company_email
+
+                const scoreColor = getScoreColor(match.match_score)
+
                 return (
-                  <div key={match.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex-1">
-                        <h3 className="text-xl font-bold text-gray-900 mb-1">{match.internship.title}</h3>
-                        <p className="text-gray-600 mb-2">{match.internship.company_name}</p>
-                        <p className="text-gray-700 mb-3">{match.internship.description}</p>
-                    </div>
-                    <div className={`px-4 py-2 rounded-lg font-bold text-lg ${getScoreColor(match.match_score)}`}>
-                      {match.match_score.toFixed(1)}%
-                    </div>
-                  </div>
+                  <div key={match.id} className="group relative">
+                    <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-primary/30 via-secondary/20 to-emerald-200 opacity-0 blur transition duration-500 group-hover:opacity-100" />
+                    <div className="relative rounded-2xl border border-transparent bg-white/90 p-6 shadow-sm ring-1 ring-gray-100 transition duration-300 group-hover:-translate-y-1 group-hover:shadow-xl">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div className="flex-1">
+                          <h3 className="text-2xl font-semibold text-gray-900">{match.internship.title}</h3>
+                          <p className="text-base text-gray-600">{match.internship.company_name}</p>
+                          <p className="mt-3 text-gray-700">{match.internship.description}</p>
+                        </div>
+                        <div
+                          className={`flex h-16 w-16 items-center justify-center rounded-2xl text-lg font-bold shadow-inner ${scoreColor} bg-white`}
+                        >
+                          {match.match_score.toFixed(1)}%
+                        </div>
+                      </div>
 
-                  <div className="grid md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <p className="text-sm text-gray-600">Location</p>
-                      <p className="font-medium text-gray-900">{match.internship.location}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Sector</p>
-                      <p className="font-medium text-gray-900">{match.internship.sector}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Duration</p>
-                      <p className="font-medium text-gray-900">{match.internship.duration_months} months</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Stipend</p>
-                      <p className="font-medium text-gray-900">₹{match.internship.stipend.toLocaleString()}/month</p>
-                    </div>
-                  </div>
+                      <div className="mt-6 grid gap-4 md:grid-cols-2">
+                        <div className="rounded-2xl bg-gray-50/80 p-5">
+                          <p className="text-sm font-semibold uppercase tracking-wide text-gray-600">Role snapshot</p>
+                          <div className="mt-3 grid grid-cols-2 gap-4 text-sm text-gray-600">
+                            <div>
+                              <p className="text-xs uppercase tracking-wide text-gray-500">Location</p>
+                              <p className="font-medium text-gray-900">{match.internship.location || "Not specified"}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-wide text-gray-500">Sector</p>
+                              <p className="font-medium text-gray-900">{match.internship.sector || "Not specified"}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-wide text-gray-500">Duration</p>
+                              <p className="font-medium text-gray-900">{match.internship.duration_months} months</p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-wide text-gray-500">Stipend</p>
+                              <p className="font-medium text-gray-900">₹{match.internship.stipend.toLocaleString()}/month</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-dashed border-gray-200 p-5">
+                          <p className="text-sm font-semibold uppercase tracking-wide text-gray-600">Required skills</p>
+                          <p className="mt-2 text-gray-900">{match.internship.required_skills}</p>
+                          <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-600">
+                            {match.internship.expectations || "Stay prepared with the listed skills and highlight relevant projects during interviews."}
+                          </div>
+                        </div>
+                      </div>
 
-                    <div className="mb-4">
-                      <p className="text-sm text-gray-600 mb-1">Required Skills</p>
-                      <p className="text-gray-900">{match.internship.required_skills}</p>
-                    </div>
+                      <div className="mt-6 rounded-2xl bg-gradient-to-r from-gray-50 via-white to-gray-50 p-5 ring-1 ring-gray-100">
+                        <p className="text-sm font-semibold text-gray-800">Match Score Breakdown</p>
+                        <div className="mt-3 grid grid-cols-2 gap-4 text-center md:grid-cols-5">
+                          <div className="text-center">
+                            <p className="text-xs text-gray-600">Skills</p>
+                            <p className="font-bold text-primary">{match.skill_score.toFixed(0)}%</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-gray-600">Location</p>
+                            <p className="font-bold text-primary">{match.location_score.toFixed(0)}%</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-gray-600">Sector</p>
+                            <p className="font-bold text-primary">{match.sector_score.toFixed(0)}%</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-gray-600">Qualification</p>
+                            <p className="font-bold text-primary">{match.qualification_score.toFixed(0)}%</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-gray-600">Diversity Bonus</p>
+                            <p className="font-bold text-green-600">+{match.affirmative_bonus.toFixed(0)}</p>
+                          </div>
+                        </div>
+                      </div>
 
-                  {/* Score Breakdown */}
-                  <div className="border-t pt-4">
-                    <p className="text-sm font-medium text-gray-700 mb-3">Match Score Breakdown</p>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                      <div className="text-center">
-                        <p className="text-xs text-gray-600">Skills</p>
-                        <p className="font-bold text-primary">{match.skill_score.toFixed(0)}%</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xs text-gray-600">Location</p>
-                        <p className="font-bold text-primary">{match.location_score.toFixed(0)}%</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xs text-gray-600">Sector</p>
-                        <p className="font-bold text-primary">{match.sector_score.toFixed(0)}%</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xs text-gray-600">Qualification</p>
-                        <p className="font-bold text-primary">{match.qualification_score.toFixed(0)}%</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xs text-gray-600">Diversity Bonus</p>
-                        <p className="font-bold text-green-600">+{match.affirmative_bonus.toFixed(0)}</p>
-                      </div>
-                    </div>
-                  </div>
+                      <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div className="flex-1">
+                          {match.application ? (
+                            <div>
+                              <p className="text-lg font-semibold text-green-600">Application Submitted</p>
+                              <div className="mt-2 text-sm text-gray-600">
+                                <span className="font-semibold text-gray-800">Current stage:</span>{" "}
+                                <span className="text-gray-900">{formatApplicationStatus(match.application.status)}</span>
+                                {match.application.created_at && (
+                                  <span className="block text-xs text-gray-500">
+                                    Applied on {new Date(match.application.created_at).toLocaleDateString()}
+                                  </span>
+                                )}
+                                {match.application.updated_at && match.application.updated_at !== match.application.created_at && (
+                                  <span className="block text-xs text-gray-500">
+                                    Last update on {new Date(match.application.updated_at).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
 
-                  <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                      {match.application ? (
-                        <>
-                          <p className="text-lg font-medium text-green-700">Application Submitted</p>
-                          <p className="text-sm text-gray-500">
-                            Status:{" "}
-                            <span className="font-bold text-gray-700">
-                              {formatApplicationStatus(match.application.status)}
-                            </span>
-                            {match.application.created_at && (
-                              <>
-                                {" "}- Applied on {new Date(match.application.created_at).toLocaleDateString()}
-                              </>
-                            )}
-                          </p>
-                          {match.application.updated_at && match.application.updated_at !== match.application.created_at && (
-                            <p className="text-xs text-gray-500">
-                              Last update on {new Date(match.application.updated_at).toLocaleDateString()}
+                              <div className="mt-6">
+                                <div className="relative">
+                                  <div className="h-2 w-full rounded-full bg-gray-200" />
+                                  <div
+                                    className="absolute top-0 left-0 h-2 rounded-full bg-gradient-to-r from-primary via-secondary to-emerald-500 transition-all duration-500"
+                                    style={{ width: `${calculateProgress(match.application.status)}%` }}
+                                  />
+                                  <div className="absolute top-1/2 left-0 right-0 flex -translate-y-1/2 justify-between">
+                                    {APPLICATION_STAGES.map((stage, index) => {
+                                      const state = getStageState(stage.value, match.application.status)
+                                      const baseCircle =
+                                        state === "completed"
+                                          ? "border-transparent bg-gradient-to-r from-primary to-secondary text-white shadow"
+                                          : state === "current"
+                                            ? "border-primary bg-white text-primary shadow"
+                                            : "border-gray-300 bg-white text-gray-400"
+
+                                      return (
+                                        <div key={stage.value} className="flex flex-col items-center">
+                                          <div
+                                            className={`flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-semibold transition ${baseCircle}`}
+                                          >
+                                            {state === "completed" ? (
+                                              <svg
+                                                className="h-5 w-5"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                viewBox="0 0 24 24"
+                                              >
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                              </svg>
+                                            ) : (
+                                              index + 1
+                                            )}
+                                          </div>
+                                          <p className="mt-2 text-xs font-medium text-gray-700">{stage.label}</p>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                                <div className="mt-10 grid gap-3 text-xs text-gray-500 md:grid-cols-5">
+                                  {APPLICATION_STAGES.map((stage) => (
+                                    <p key={stage.value} className="text-center md:text-left">
+                                      {stage.description}
+                                    </p>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-600">
+                              Interested? Submit your application directly to the company.
                             </p>
                           )}
-                        </>
-                      ) : (
-                        <p className="text-sm text-gray-600">
-                          Interested? Submit your application directly to the company.
-                        </p>
-                      )}
+                        </div>
+                        <div className="flex flex-col gap-3 md:w-48">
+                          <button
+                            onClick={() => applyToInternship(match)}
+                            disabled={Boolean(match.application) || applyingId === match.internship_id}
+                            className="inline-flex items-center justify-center rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {match.application
+                              ? "Already Applied"
+                              : applyingId === match.internship_id
+                                ? "Submitting..."
+                                : "Apply Now"}
+                          </button>
+                          {recruiterEmail ? (
+                            <a
+                              href={`mailto:${recruiterEmail}`}
+                              className="inline-flex items-center justify-center rounded-xl border border-gray-200 px-6 py-3 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+                            >
+                              Connect with Recruiter
+                            </a>
+                          ) : (
+                            <span className="inline-flex items-center justify-center rounded-xl border border-dashed border-gray-200 px-6 py-3 text-sm font-semibold text-gray-400">
+                              Recruiter contact unavailable
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => applyToInternship(match)}
-                      disabled={Boolean(match.application) || applyingId === match.internship_id}
-                      className="px-6 py-3 rounded-lg font-medium text-white bg-primary hover:bg-secondary transition disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {match.application
-                        ? "Already Applied"
-                        : applyingId === match.internship_id
-                          ? "Submitting..."
-                          : "Apply Now"}
-                    </button>
                   </div>
-                </div>
                 )
               })}
             </div>
