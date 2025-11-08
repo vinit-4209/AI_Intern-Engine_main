@@ -6,7 +6,7 @@ from typing import Dict, List
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
-from database import Application, Internship, Student, get_db
+from database import Application, Internship, Match, Student, get_db
 from schemas import ApplicationCreate, ApplicationResponse, CompanyApplicationResponse
 
 router = APIRouter(prefix="/api/applications", tags=["applications"])
@@ -63,7 +63,21 @@ def delete_application(application_id: int, db: Session = Depends(get_db)):
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
 
+    student_id = application.student_id
+    internship_id = application.internship_id
+
     db.delete(application)
+
+    match = (
+        db.query(Match)
+        .filter(Match.student_id == student_id, Match.internship_id == internship_id)
+        .first()
+    )
+    if match:
+        match.status = "new"
+        match.feedback = None
+        match.status_updated_at = datetime.utcnow()
+
     db.commit()
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
