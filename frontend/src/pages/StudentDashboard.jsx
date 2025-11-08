@@ -253,7 +253,13 @@ function StudentDashboard({ user, onLogout }) {
       setMatches((previousMatches) =>
         previousMatches.map((currentMatch) =>
           currentMatch.id === match.id
-            ? { ...currentMatch, application: null }
+            ? {
+                ...currentMatch,
+                application: null,
+                status: "new",
+                feedback: null,
+                status_updated_at: new Date().toISOString(),
+              }
             : currentMatch,
         ),
       )
@@ -503,7 +509,7 @@ function StudentDashboard({ user, onLogout }) {
                                 )}
                               </div>
 
-                              <div className="mt-6">
+                              <div className="mt-10">
                                 <div className="relative">
                                   <div className="h-2 w-full rounded-full bg-gray-200" />
                                   <div
