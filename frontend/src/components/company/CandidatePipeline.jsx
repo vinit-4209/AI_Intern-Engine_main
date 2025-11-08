@@ -1,14 +1,12 @@
 "use client"
 
 import { useMemo, useState } from "react"
-
-import api from "../../api/axios"
 import { formatDateTime } from "../../utils/formatDate"
 
 const STATUS_OPTIONS = [
   { value: "new", label: "New" },
   { value: "shortlisted", label: "Shortlisted" },
-  { value: "contacted", label: "Contacted" },
+  { value: "contacted", label: "Interview" },
   { value: "hired", label: "Hired" },
   { value: "rejected", label: "Not a Fit" },
 ]
@@ -311,113 +309,142 @@ function CandidatePipeline({
             <p className="text-sm text-gray-500">Try adjusting your filters or refreshing recommendations.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-left text-sm">
-              <thead className="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Candidate</th>
-                  <th className="px-4 py-3 font-medium">Internship match</th>
-                  <th className="px-4 py-3 font-medium">Skills &amp; experience</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredCandidates.map((candidate) => {
-                  const student = candidate.student
-                  const matchScore = typeof candidate.match_score === "number" ? candidate.match_score : 0
-                  const internship = candidate.internship || {}
-                  const application = candidate.application
-                  const primarySkills = (student?.skills || "")
-                    .split(",")
-                    .map((skill) => skill.trim())
-                    .filter(Boolean)
-                    .slice(0, 3)
-                  const supplementarySkills = (student?.resume_skills || "")
-                    .split(",")
-                    .map((skill) => skill.trim())
-                    .filter(Boolean)
-                    .slice(0, 3)
-                  const combinedSkills = [...primarySkills, ...supplementarySkills].filter(Boolean)
-                  const statusLabel = STATUS_OPTIONS.find((option) => option.value === candidate.status)?.label || "New"
-                  const statusClass = STATUS_STYLES[candidate.status] || STATUS_STYLES.new
-                  const applicationStatusLabel = application
-                    ? STATUS_OPTIONS.find((option) => option.value === application.status)?.label || application.status
-                    : null
-                  return (
-                    <tr key={candidate.match_id} className="align-top">
-                      <td className="px-4 py-4">
-                        <div className="font-semibold text-gray-900">{student?.name}</div>
-                        <div className="text-sm text-gray-500">{student?.email}</div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                          {student?.phone && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1">
-                              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5l7 7-7 7m11-14h4a2 2 0 012 2v12a2 2 0 01-2 2h-4" />
-                              </svg>
-                              {student.phone}
+          <div className="grid gap-6">
+            {filteredCandidates.map((candidate) => {
+              const student = candidate.student
+              const matchScore = typeof candidate.match_score === "number" ? candidate.match_score : 0
+              const internship = candidate.internship || {}
+              const application = candidate.application
+              const primarySkills = (student?.skills || "")
+                .split(",")
+                .map((skill) => skill.trim())
+                .filter(Boolean)
+                .slice(0, 6)
+              const supplementarySkills = (student?.resume_skills || "")
+                .split(",")
+                .map((skill) => skill.trim())
+                .filter(Boolean)
+                .slice(0, 6)
+              const combinedSkills = [...primarySkills, ...supplementarySkills].filter(Boolean)
+              const statusLabel = STATUS_OPTIONS.find((option) => option.value === candidate.status)?.label || "New"
+              const statusClass = STATUS_STYLES[candidate.status] || STATUS_STYLES.new
+              const applicationStatusLabel = application
+                ? STATUS_OPTIONS.find((option) => option.value === application.status)?.label || application.status
+                : null
+
+              return (
+                <div
+                  key={candidate.match_id}
+                  className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+                >
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-primary/5 to-sky-500/10 opacity-0 blur-sm transition duration-300 group-hover:opacity-100" />
+                  <div className="relative flex flex-col gap-6">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                      <div className="flex flex-1 flex-col gap-4 md:flex-row md:items-start md:gap-4">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10 text-lg font-bold text-emerald-600 shadow-inner">
+                          {matchScore.toFixed(1)}%
+                        </div>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-xl font-semibold text-gray-900">{student?.name}</h3>
+                            <span className="inline-flex items-center rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-purple-700">
+                              {candidate.experience_level === "experienced" ? "Experienced" : "Fresher"}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-500">{student?.email}</p>
+                          <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-500">
+                            {student?.phone && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1">
+                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5l7 7-7 7m11-14h4a2 2 0 012 2v12a2 2 0 01-2 2h-4" />
+                                </svg>
+                                {student.phone}
+                              </span>
+                            )}
+                            {student?.location && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1">
+                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 21c4.97-4.666 8-8.333 8-11a8 8 0 10-16 0c0 2.667 3.03 6.334 8 11z" />
+                                </svg>
+                                {student.location}
+                              </span>
+                            )}
+                            {student?.qualification && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-1 text-indigo-700">
+                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 14l9-5-9-5-9 5 9 5zm0 0v6" />
+                                </svg>
+                                {student.qualification}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 text-right">
+                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold capitalize shadow-sm ${statusClass}`}>
+                          {statusLabel}
+                        </span>
+                        <p className="text-xs text-gray-500">Last updated: {formatDateTime(candidate.status_updated_at)}</p>
+                        {application && (
+                          <div className="text-xs text-gray-500">
+                            <p>
+                              Application stage:{" "}
+                              <span className="font-semibold text-gray-700">{applicationStatusLabel}</span>
+                            </p>
+                            <p>Updated on: {formatDateTime(application.updated_at || application.created_at)}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+                      <div className="rounded-2xl bg-gray-50/80 p-5">
+                        <p className="text-sm font-semibold uppercase tracking-wide text-gray-600">Internship match</p>
+                        <p className="mt-2 text-lg font-semibold text-gray-900">{internship.title}</p>
+                        <p className="text-sm text-gray-500">{internship.company_name}</p>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                          {internship.sector && (
+                            <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-blue-700">{internship.sector}</span>
+                          )}
+                          {internship.location && (
+                            <span className="inline-flex rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">{internship.location}</span>
+                          )}
+                          {internship.duration_months && (
+                            <span className="inline-flex rounded-full bg-orange-50 px-2 py-1 text-orange-600">
+                              {internship.duration_months} months
                             </span>
                           )}
-                          {student?.location && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1">
-                              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 21c4.97-4.666 8-8.333 8-11a8 8 0 10-16 0c0 2.667 3.03 6.334 8 11z" />
-                              </svg>
-                              {student.location}
-                            </span>
-                          )}
-                          {student?.qualification && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-1 text-indigo-700">
-                              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 14l9-5-9-5-9 5 9 5zm0 0v6" />
-                              </svg>
-                              {student.qualification}
+                          {internship.stipend && (
+                            <span className="inline-flex rounded-full bg-teal-50 px-2 py-1 text-teal-700">
+                              ₹{internship.stipend.toLocaleString()}/month
                             </span>
                           )}
                         </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-50 text-base font-bold text-green-700">
-                            {matchScore.toFixed(1)}%
-                          </div>
+                        <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-gray-600 sm:grid-cols-4">
                           <div>
-                            <p className="font-medium text-gray-900">{internship.title}</p>
-                            <p className="text-sm text-gray-500">{internship.company_name}</p>
-                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
-                              {internship.sector && (
-                                <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-blue-700">{internship.sector}</span>
-                              )}
-                              {internship.location && (
-                                <span className="inline-flex rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">{internship.location}</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-gray-500 md:grid-cols-4">
-                          <div>
-                            <p className="font-semibold text-gray-600">Skills</p>
+                            <p className="font-semibold text-gray-700">Skills</p>
                             <p>{Math.round(candidate.skill_score ?? 0)}%</p>
                           </div>
                           <div>
-                            <p className="font-semibold text-gray-600">Location</p>
+                            <p className="font-semibold text-gray-700">Location</p>
                             <p>{Math.round(candidate.location_score ?? 0)}%</p>
                           </div>
                           <div>
-                            <p className="font-semibold text-gray-600">Qualification</p>
+                            <p className="font-semibold text-gray-700">Qualification</p>
                             <p>{Math.round(candidate.qualification_score ?? 0)}%</p>
                           </div>
                           <div>
-                            <p className="font-semibold text-gray-600">Sector</p>
+                            <p className="font-semibold text-gray-700">Sector</p>
                             <p>{Math.round(candidate.sector_score ?? 0)}%</p>
                           </div>
                         </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-wrap gap-2">
+                      </div>
+                      <div className="rounded-2xl border border-dashed border-gray-200 p-5">
+                        <p className="text-sm font-semibold uppercase tracking-wide text-gray-600">Key strengths</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
                           {combinedSkills.length > 0 ? (
                             combinedSkills.map((skill) => (
-                              <span key={skill} className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
+                              <span key={skill} className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-700 shadow">
                                 {skill}
                               </span>
                             ))
@@ -425,66 +452,55 @@ function CandidatePipeline({
                             <span className="text-sm text-gray-400">No skills captured</span>
                           )}
                         </div>
-                        <div className="mt-3 inline-flex items-center rounded-full bg-purple-50 px-3 py-1 text-xs font-medium uppercase tracking-wide text-purple-700">
-                          {candidate.experience_level === "experienced" ? "Experienced" : "Fresher"}
-                        </div>
-                        {student?.resume_summary && <p className="mt-2 text-sm text-gray-500">{student.resume_summary}</p>}
-                        {/* {canDownloadResume && (
-                          // <button
-                          //   onClick={() => window.open(`${api.defaults.baseURL}/students/${student.id}/resume`, "_blank")}
-                          //   className="mt-3 text-sm font-medium text-primary hover:underline"
-                          // >
-                          //   Download Resume
-                          // </button>
-                        )} */}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize ${statusClass}`}>
-                          {statusLabel}
-                        </span>
-                        <p className="mt-2 text-xs text-gray-500">Last updated: {formatDateTime(candidate.status_updated_at)}</p>
-                        {application && (
-                          <div className="mt-2 text-xs text-gray-500">
-                            <p>
-                              Application status:{" "}
-                              <span className="font-semibold text-gray-700">{applicationStatusLabel}</span>
-                            </p>
-                            <p>Updated on: {formatDateTime(application.updated_at || application.created_at)}</p>
-                          </div>
+                        {student?.resume_summary && (
+                          <p className="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-600">
+                            {student.resume_summary}
+                          </p>
                         )}
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-col gap-3">
-                          <select
-                            value={candidate.status || "new"}
-                            onChange={(event) => onStatusChange(candidate.match_id, event.target.value)}
-                            disabled={statusUpdating === candidate.match_id}
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-600 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {STATUS_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={() => onFeedbackOpen(candidate)}
-                            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
-                          >
-                            {candidate.feedback ? "Edit feedback" : "Add feedback"}
-                          </button>
-                          {candidate.feedback ? (
-                            <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">{candidate.feedback}</p>
-                          ) : (
-                            <p className="text-xs text-gray-400">No recruiter feedback yet.</p>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                        {candidate.feedback && (
+                          <p className="mt-4 rounded-xl bg-amber-50 p-4 text-xs text-amber-700">
+                            Recruiter note: {candidate.feedback}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                      <div className="rounded-2xl bg-white/70 p-4 shadow-inner ring-1 ring-gray-100">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">AI insight</p>
+                        <p className="mt-2 text-sm text-gray-600">
+                          This candidate aligns strongly with the role based on {Math.round(candidate.skill_score ?? 0)}% skill fit
+                          and {Math.round(candidate.location_score ?? 0)}% location match. Consider moving them to interview to maintain momentum.
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-3 md:w-64">
+                        <select
+                          value={candidate.status || "new"}
+                          onChange={(event) => onStatusChange(candidate.match_id, event.target.value)}
+                          disabled={statusUpdating === candidate.match_id}
+                          className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm font-medium focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-600 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {STATUS_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => onFeedbackOpen(candidate)}
+                          className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-green-500 hover:text-green-600"
+                        >
+                          {candidate.feedback ? "Edit feedback" : "Add feedback"}
+                        </button>
+                        {!candidate.feedback && (
+                          <p className="text-xs text-gray-400">No recruiter feedback yet.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
