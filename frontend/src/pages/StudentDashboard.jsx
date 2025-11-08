@@ -54,6 +54,44 @@ function StudentDashboard({ user, onLogout }) {
     }, {})
   }, [APPLICATION_STAGES])
 
+  const APPLICATION_STAGES = useMemo(
+    () => [
+      {
+        value: "pending",
+        label: "Pending",
+        description: "Your application has been submitted and is awaiting review.",
+      },
+      {
+        value: "shortlisted",
+        label: "Shortlisted",
+        description: "The company liked your profile and moved you forward.",
+      },
+      {
+        value: "contacted",
+        label: "Interview",
+        description: "Interview discussions are in progress with the company.",
+      },
+      {
+        value: "hired",
+        label: "Hired",
+        description: "Congratulations! You have been selected for the role.",
+      },
+      {
+        value: "rejected",
+        label: "Not a Fit",
+        description: "The application was closed for this opportunity.",
+      },
+    ],
+    [],
+  )
+
+  const stageOrder = useMemo(() => {
+    return APPLICATION_STAGES.reduce((map, stage, index) => {
+      map[stage.value] = index
+      return map
+    }, {})
+  }, [APPLICATION_STAGES])
+
   useEffect(() => {
     fetchStudentInfo()
     fetchMatches()
@@ -264,6 +302,25 @@ function StudentDashboard({ user, onLogout }) {
     } finally {
       setWithdrawingId(null)
     }
+  }
+
+  const getStageState = (stageValue, currentStatus) => {
+    const normalized = normalizeApplicationStatus(currentStatus)
+    const currentIndex = stageOrder[normalized] ?? 0
+    const stageIndex = stageOrder[stageValue] ?? 0
+
+    if (stageIndex < currentIndex) return "completed"
+    if (stageIndex === currentIndex) return "current"
+    return "upcoming"
+  }
+
+  const calculateProgress = (status) => {
+    const normalized = normalizeApplicationStatus(status)
+    const currentIndex = stageOrder[normalized] ?? 0
+    const totalStages = APPLICATION_STAGES.length - 1
+    if (totalStages <= 0) return 0
+
+    return Math.min(100, Math.max(0, (currentIndex / totalStages) * 100))
   }
 
   return (
