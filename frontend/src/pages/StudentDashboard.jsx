@@ -413,7 +413,10 @@ function StudentDashboard({ user, onLogout }) {
                 const progressBarClass =
                   normalizedApplicationStatus === "rejected"
                     ? "bg-gradient-to-r from-rose-500 via-rose-400 to-rose-300"
-                    : "bg-gradient-to-r from-primary via-secondary to-emerald-500"
+                    // : "bg-gradient-to-r from-green-500 via-green-400 to-green-300"
+                    : "bg-green-500"
+
+
 
                 return (
                   <div key={match.id} className="group relative">
@@ -524,7 +527,7 @@ function StudentDashboard({ user, onLogout }) {
                                         state === "completed"
                                           ? isOutcomeStage && normalizedApplicationStatus === "rejected"
                                             ? "border-transparent bg-gradient-to-r from-rose-500 to-rose-400 text-white shadow"
-                                            : "border-transparent bg-gradient-to-r from-primary to-secondary text-white shadow"
+                                            : "border-transparent bg-green-500 text-white shadow"
                                           : state === "current"
                                             ? "border-primary bg-white text-primary shadow"
                                             : "border-gray-300 bg-white text-gray-400"
