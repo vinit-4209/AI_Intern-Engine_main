@@ -21,10 +21,23 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
 # SQLite database URL (creates a file named 'internship.db')
-DATABASE_URL = "sqlite:///./internship.db"
+# DATABASE_URL = "sqlite:///./internship.db"
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "intern_engine.db")
+
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
+
+
 
 # Create database engine
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+)
+
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
