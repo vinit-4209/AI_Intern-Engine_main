@@ -1,9 +1,11 @@
 """
-Database configuration and models using SQLAlchemy
-This file sets up the SQLite database and defines all data models
+Database configuration and models using SQLAlchemy.
+Uses PostgreSQL in production.
 """
 
 from typing import Optional
+from datetime import datetime
+import os
 
 from sqlalchemy import (
     create_engine,
@@ -16,31 +18,32 @@ from sqlalchemy import (
     Text,
     inspect,
 )
+
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime
-
-# SQLite database URL (creates a file named 'internship.db')
-# DATABASE_URL = "sqlite:///./internship.db"
-import os
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "intern_engine.db")
-
-SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 
+# PostgreSQL Database URL from environment variable
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Create database engine
-# engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is not set")
+
+
+# Create PostgreSQL database engine
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
+    DATABASE_URL,
+    pool_pre_ping=True,
 )
 
 
 # Create session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+)
+
 
 # Base class for models
 Base = declarative_base()
@@ -149,35 +152,6 @@ class Admin(Base):
 def init_db():
     Base.metadata.create_all(bind=engine)
 
-    # Lightweight schema migrations for new resume-related columns.
-    with engine.begin() as conn:
-        inspector = inspect(conn)
-        student_columns = {col["name"] for col in inspector.get_columns("students")}
-
-        def add_student_column_if_missing(column_name: str, ddl: str) -> None:
-            if column_name not in student_columns:
-                conn.exec_driver_sql(f"ALTER TABLE students ADD COLUMN {ddl}")
-                student_columns.add(column_name)
-
-        add_student_column_if_missing("resume_filename", "resume_filename TEXT")
-        add_student_column_if_missing("resume_text", "resume_text TEXT")
-        add_student_column_if_missing("resume_skills", "resume_skills TEXT")
-        add_student_column_if_missing("resume_summary", "resume_summary TEXT")
-        add_student_column_if_missing("resume_sector_insights", "resume_sector_insights TEXT")
-
-        match_columns = {col["name"] for col in inspector.get_columns("matches")}
-
-        def add_match_column_if_missing(column_name: str, ddl: str, post_sql: Optional[str] = None) -> None:
-            if column_name not in match_columns:
-                conn.exec_driver_sql(f"ALTER TABLE matches ADD COLUMN {ddl}")
-                match_columns.add(column_name)
-                if post_sql:
-                    conn.exec_driver_sql(post_sql)
-
-        add_match_column_if_missing("status", "status TEXT DEFAULT 'new'", "UPDATE matches SET status = 'new' WHERE status IS NULL")
-        add_match_column_if_missing("status_updated_at", "status_updated_at DATETIME", "UPDATE matches SET status_updated_at = COALESCE(status_updated_at, created_at)")
-        add_match_column_if_missing("feedback", "feedback TEXT")
-
 
 # Dependency to get database session
 def get_db():
@@ -186,3 +160,48 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+
+
+# Create all tables
+# def init_db():
+#     Base.metadata.create_all(bind=engine)
+
+#     # Lightweight schema migrations for new resume-related columns.
+#     with engine.begin() as conn:
+#         inspector = inspect(conn)
+#         student_columns = {col["name"] for col in inspector.get_columns("students")}
+
+#         def add_student_column_if_missing(column_name: str, ddl: str) -> None:
+#             if column_name not in student_columns:
+#                 conn.exec_driver_sql(f"ALTER TABLE students ADD COLUMN {ddl}")
+#                 student_columns.add(column_name)
+
+#         add_student_column_if_missing("resume_filename", "resume_filename TEXT")
+#         add_student_column_if_missing("resume_text", "resume_text TEXT")
+#         add_student_column_if_missing("resume_skills", "resume_skills TEXT")
+#         add_student_column_if_missing("resume_summary", "resume_summary TEXT")
+#         add_student_column_if_missing("resume_sector_insights", "resume_sector_insights TEXT")
+
+#         match_columns = {col["name"] for col in inspector.get_columns("matches")}
+
+#         def add_match_column_if_missing(column_name: str, ddl: str, post_sql: Optional[str] = None) -> None:
+#             if column_name not in match_columns:
+#                 conn.exec_driver_sql(f"ALTER TABLE matches ADD COLUMN {ddl}")
+#                 match_columns.add(column_name)
+#                 if post_sql:
+#                     conn.exec_driver_sql(post_sql)
+
+#         add_match_column_if_missing("status", "status TEXT DEFAULT 'new'", "UPDATE matches SET status = 'new' WHERE status IS NULL")
+#         add_match_column_if_missing("status_updated_at", "status_updated_at DATETIME", "UPDATE matches SET status_updated_at = COALESCE(status_updated_at, created_at)")
+#         add_match_column_if_missing("feedback", "feedback TEXT")
+
+
+# # Dependency to get database session
+# def get_db():
+#     db = SessionLocal()
+#     try:
+#         yield db
+#     finally:
+#         db.close()
